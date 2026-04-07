@@ -6,10 +6,9 @@ def get_volume():
   volume = "0"
   for element in elements:
     if "%" in element:
-      volume = f"0.{element[0:-1:]}"
+      volume = f"{float(element[0:-1:]) / 100}"
       break
   return volume
-
 
 # playerctl wrapper
 def playerctl(*args, player=None):

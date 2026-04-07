@@ -5,6 +5,7 @@ import urllib.request
 
 # Settings
 CACHE_DIR = "lrc_cache/"
+SOURCES = ["https://lrclib.net/api/get?", "https://cyberia.si/lyrics.php?"]
 
 # Store lrc file to the specified directory
 def store_lrc_to_cache(title, artist, album, length, lyrics):
@@ -31,21 +32,24 @@ def get_lyrics(title, artist, album, length):
   # Check if we have the file in our cache
   cached_lyrics = get_lrc_from_cache(title, artist, album, length)
   if cached_lyrics:
-    return cached_lyrics
+    return (f"Using stored lyrics", cached_lyrics)
 
-  # Try hitting the lrclib API if they have synced lyrics
-  url = f"https://lrclib.net/api/get?artist_name={urllib.parse.quote(artist)}&track_name={urllib.parse.quote(title)}&album_name={urllib.parse.quote(album)}&duration={urllib.parse.quote(str(length))}"
   json_response = {"syncedLyrics": ""}
-  try:
-    request = urllib.request.Request(url, headers={"User-Agent": "mediaplayer/1.0"})
-    with urllib.request.urlopen(request, timeout=2) as response:
-      json_response = json.loads(response.read().decode())
-  except Exception as err: # Lookup unsuccessful
-    return f"LRCERROR: {err}"
+  for i, source in enumerate(SOURCES):
+    # Try hitting the lrclib (or other compatible) API if they have synced lyrics
+    url = f"{source}artist_name={urllib.parse.quote(artist)}&track_name={urllib.parse.quote(title)}&album_name={urllib.parse.quote(album)}&duration={urllib.parse.quote(str(length))}"
+    try:
+      request = urllib.request.Request(url, headers={"User-Agent": "mediaplayer/1.0"})
+      with urllib.request.urlopen(request, timeout=2) as response:
+        json_response = json.loads(response.read().decode())
+        break
+    except Exception as err: # Lookup unsuccessful, return error if on last source
+      if i == len(SOURCES) - 1:
+        return (f"LRCERROR on {url}: {err}", "")
 
   # Store lrc file to our cache and return them
   store_lrc_to_cache(title, artist, album, length, json_response["syncedLyrics"])
-  return json_response["syncedLyrics"]
+  return (f"Fetched lyrics from {url}", json_response["syncedLyrics"])
 
 # Convert a lrc file to our bespoke format, which is a list of lists
 # The first element in the nested list is the timestamp, with the second being the line
